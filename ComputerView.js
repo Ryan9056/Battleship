@@ -6,7 +6,7 @@ class ComputerView extends Phaser.Scene {
     }
 
     preload() {
-        this.load.image("wave", "assets/wave.png");
+        this.load.image("ocean", "assets/ocean.avif");
 
 
     }
@@ -23,7 +23,7 @@ class ComputerView extends Phaser.Scene {
                 // Add the wave image to the scene at the correct position
                 const x = col * cellSize;
                 const y = row * cellSize;
-                const wave = this.add.image(x, y, "wave");
+                const wave = this.add.image(x, y, "ocean");
     
                 // Center the wave image in the cell
                 wave.setOrigin(0);
