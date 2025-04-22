@@ -3,7 +3,7 @@ const app = express();
 const port = 3000;
 
 // Serve static files (e.g., your HTML, JS, and assets)
-app.use(express.static('public'));
+app.use(express.static('webpage'));
 
 // Define a basic route
 app.get('/', (req, res) => {
