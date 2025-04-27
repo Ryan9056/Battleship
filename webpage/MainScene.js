@@ -12,13 +12,14 @@ class MainScene extends Phaser.Scene {
         this.infoboard;
         this.CPUinfo;
         this.textStyle = {
-            font: '28px Arial',  // Font and size
-            fill: 'Black',     // Text color (white)
-            align: 'center',     // Align text in the center
-            stroke: '#000000',   // Optional: stroke color (black)
-            strokeThickness: 2   // Optional: stroke thickness
+            font: '28px Arial',
+            fill: 'Black', 
+            align: 'center', 
+            stroke: '#000000',   
+            strokeThickness: 2   
         };
         this.isOver = 0;
+        this.winAmount = 0;
     }
 
     preload() {
@@ -33,11 +34,14 @@ class MainScene extends Phaser.Scene {
     create() {
 
 
+        this.winAmount = this.add.text(160, 840, "test", this.textStyle)
+        this.winAmount.setOrigin(0.5, 0.5);
+
         this.CPUboard = this.generateBoards();
         this.Playerboard = this.generateBoards();
 
 
-        // remove when complete
+        // Cheat Sheet
         for (let row = 0; row < this.CPUboard.length; row++) {
             let rowString = '';
             for (let col = 0; col < this.CPUboard[row].length; col++) {
@@ -117,9 +121,6 @@ class MainScene extends Phaser.Scene {
 
     }
 
-    update() {
-
-    }
 
     onClickWave(x, y, wave) {
         if (this.isOver === 0) {
@@ -403,7 +404,7 @@ class MainScene extends Phaser.Scene {
 
 new Phaser.Game({
     width: 400,
-    height: 800,
+    height: 900,
     backgroundColor: 0xffffff,
     scene: MainScene,
     physics: { default: 'arcade' },
