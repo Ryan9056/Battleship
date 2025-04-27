@@ -6,6 +6,9 @@ class MainScene extends Phaser.Scene {
         this.Playerboard = Array.from({ length: 10 }, () => Array(10).fill(0));;
         this.Playerattemptboard = Array.from({ length: 10 }, () => Array(10).fill(0));
         this.CPUattemptboard = Array.from({ length: 10 }, () => Array(10).fill(0));
+        this.recentHits = 0;
+        this.lastx;
+        this.lasty;
     }
 
     preload() {
@@ -28,15 +31,15 @@ class MainScene extends Phaser.Scene {
         for (let row = 0; row < this.CPUboard.length; row++) {
             let rowString = '';
             for (let col = 0; col < this.CPUboard[row].length; col++) {
-                rowString += this.CPUboard[row][col] + ' '; 
+                rowString += this.CPUboard[row][col] + ' ';
             }
-            console.log(rowString); 
+            console.log(rowString);
         }
 
 
 
 
-        
+
 
 
         const CPUarray = Array.from({ length: 10 }, () => Array(10).fill(0));
@@ -100,7 +103,7 @@ class MainScene extends Phaser.Scene {
         if (this.Playerattemptboard[x][y] != 1 && this.Playerattemptboard[x][y] != 2) {
             this.gameChecks(x, y, wave);
             this.CPUmove(wave);
-        } 
+        }
         wave.disableInteractive(false);
         wave.clearTint();
 
@@ -122,8 +125,8 @@ class MainScene extends Phaser.Scene {
 
 
         const placeShip = (size) => {
-            let row; 
-            let col; 
+            let row;
+            let col;
             let dir;
             let canPlace;
 
@@ -148,7 +151,7 @@ class MainScene extends Phaser.Scene {
                         }
                     }
                 }
-            } 
+            }
 
 
             for (let i = 0; i < size; i++) {
@@ -173,50 +176,102 @@ class MainScene extends Phaser.Scene {
             this.Playerattemptboard[x][y] = 1;
             wave.setTexture('miss');
             console.log("miss");
-        } else if (this.CPUboard[x][y] == 1)
-        {
+        } else if (this.CPUboard[x][y] == 1) {
             this.Playerattemptboard[x][y] = 2;
             wave.setTexture('hit');
             console.log("hit");
-            if(this.Playerattemptboard.flat().filter(x => x ===2).length >= 17) {
+            if (this.Playerattemptboard.flat().filter(x => x === 2).length >= 17) {
                 //win 
                 console.log("win");
             }
-        } 
-
-
+        }
 
     }
 
-        
 
-        
 
-    
+
+
+
 
 
 
     CPUmove() {
-        let x = Math.floor(Math.random() * 10);
-        let y = Math.floor(Math.random() * 10);
+        let x;
+        let y;
+        let ran;
+        let smartpick = 0;
 
-        while (this.CPUattemptboard[x][y] === 1 || this.CPUattemptboard[x][y] === 2) {
+        if (this.recentHits > 0) {
+            x = this.lastx;
+            y = this.lasty;
+            let loop = true;
+
+            while (x < 0 || x >= this.CPUattemptboard.length || y < 0 || y >= this.CPUattemptboard[x].length || this.CPUattemptboard[x][y] === 1 || this.CPUattemptboard[x][y] === 2 || loop === true) {
+                x = this.lastx;
+                y = this.lasty;
+
+                ran = Math.floor(Math.random() * 4);
+                console.log("random number" + ran);
+
+                if (ran === 0) {
+                    x++;
+                    console.log("x++")
+                } else if (ran == 1) {
+                    x--;
+                    console.log("x--")
+                } else if (ran === 2) {
+                    y++;
+                    console.log("y++")
+                } else if (ran === 3) {
+                    y--;
+                    console.log("y--")
+                }
+
+                if (!(x < 0 || x >= this.CPUattemptboard.length || y < 0 || y >= this.CPUattemptboard[x].length || this.CPUattemptboard[x][y] === 1 || this.CPUattemptboard[x][y] === 2)) {
+                    smartpick = 1;
+                    loop = false;
+                    break;
+                }
+
+                this.recentHits--;
+                if (this.recentHits <= 0) {
+                    smartpick = 0;
+                    loop = false;
+                    break;
+                }
+
+
+                console.log(this.recentHits);
+
+            }
+
+        }
+        if (smartpick != 1) {
             x = Math.floor(Math.random() * 10);
             y = Math.floor(Math.random() * 10);
+
+            while (this.CPUattemptboard[x][y] === 1 || this.CPUattemptboard[x][y] === 2) {
+                x = Math.floor(Math.random() * 10);
+                y = Math.floor(Math.random() * 10);
+            }
         }
 
         if (this.Playerboard[x][y] == 0) {
             this.CPUattemptboard[x][y] = 1;
             console.log("CPU miss");
-        } else if (this.Playerboard[x][y] == 1)
-        {
+            this.recentHits = this.recentHits - 2;
+        } else if (this.Playerboard[x][y] == 1) {
             this.CPUattemptboard[x][y] = 2;
             console.log("CPU hit");
-            if(this.CPUattemptboard.flat().filter(x => x ===2).length >= 17) {
+            this.recentHits = 4;
+            this.lastx = x;
+            this.lasty = y;
+            if (this.CPUattemptboard.flat().filter(x => x === 2).length >= 17) {
                 //lose
                 console.log("lose");
             }
-        } 
+        }
         const Playerarray = Array.from({ length: 10 }, () => Array(10).fill(0));
 
         for (let row = 0; row < 10; row++) {
