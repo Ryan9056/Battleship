@@ -11,6 +11,8 @@ class MainScene extends Phaser.Scene {
     preload() {
         this.load.image("ocean", "assets/ocean.png");
         this.load.image("ship", "assets/ship.png");
+        this.load.image("hit", "assets/hit.png");
+        this.load.image("miss", "assets/miss.png");
 
 
     }
@@ -34,7 +36,7 @@ class MainScene extends Phaser.Scene {
 
 
 
-        const cellSize = 32;
+        
 
 
         const CPUarray = Array.from({ length: 10 }, () => Array(10).fill(0));
@@ -43,22 +45,18 @@ class MainScene extends Phaser.Scene {
         for (let row = 0; row < 10; row++) {
             for (let col = 0; col < 10; col++) {
                 // Add the wave image to the scene at the correct position
-                const x = col * cellSize;
-                const y = row * cellSize;
+                const x = col * 32;
+                const y = row * 32;
 
                 const wave = this.add.image(x, y, "ocean");
 
-                // remove when complete
-                if (this.CPUboard[row][col] == 1) {
-                    wave.setTexture('ship');
-                }
 
                 wave.setScale(.05);
 
                 // Center the wave image in the cell
                 wave.setOrigin(0)
                     .setInteractive()
-                    .on('pointerdown', () => this.onClick(row, col))
+                    .on('pointerdown', () => this.onClick(row, col, wave))
                     .on('pointerover', () => this.enterButtonHoverState(wave))
                     .on('pointerout', () => this.enterButtonRestState(wave));
 
@@ -74,8 +72,8 @@ class MainScene extends Phaser.Scene {
         for (let row = 0; row < 10; row++) {
             for (let col = 0; col < 10; col++) {
                 // Add the wave image to the scene at the correct position
-                const x = col * cellSize;
-                const y = row * cellSize + 400;
+                const x = col * 32;
+                const y = row * 32 + 400;
                 const wave = this.add.image(x, y, "ocean");
 
                 if (this.Playerboard[row][col] == 1) {
@@ -98,15 +96,13 @@ class MainScene extends Phaser.Scene {
 
     }
 
-    onClick(x, y) {
-        console.log(x + " " + y);
+    onClick(x, y, wave) {
         if (this.Playerattemptboard[x][y] != 1 && this.Playerattemptboard[x][y] != 2) {
-            this.gameChecks(x, y);
-            this.CPUmove();
-        } else {
-            //can't choose option
-            console.log("can't choose option");
-        }
+            this.gameChecks(x, y, wave);
+            this.CPUmove(wave);
+        } 
+        wave.disableInteractive(false);
+        wave.clearTint();
 
     }
 
@@ -172,13 +168,15 @@ class MainScene extends Phaser.Scene {
         return board;
     }
 
-    gameChecks(x, y) {
+    gameChecks(x, y, wave) {
         if (this.CPUboard[x][y] == 0) {
             this.Playerattemptboard[x][y] = 1;
+            wave.setTexture('miss');
             console.log("miss");
         } else if (this.CPUboard[x][y] == 1)
         {
             this.Playerattemptboard[x][y] = 2;
+            wave.setTexture('hit');
             console.log("hit");
             if(this.Playerattemptboard.flat().filter(x => x ===2).length >= 17) {
                 //win 
@@ -186,11 +184,15 @@ class MainScene extends Phaser.Scene {
             }
         } 
 
-        
 
-        
 
     }
+
+        
+
+        
+
+    
 
 
 
@@ -215,7 +217,34 @@ class MainScene extends Phaser.Scene {
                 console.log("lose");
             }
         } 
-        console.log(x + " " + y);
+        const Playerarray = Array.from({ length: 10 }, () => Array(10).fill(0));
+
+        for (let row = 0; row < 10; row++) {
+            for (let col = 0; col < 10; col++) {
+                // Add the wave image to the scene at the correct position
+                const x = col * 32;
+                const y = row * 32 + 400;
+                const wave = this.add.image(x, y, "ocean");
+
+                if (this.Playerboard[row][col] == 1) {
+                    wave.setTexture('ship');
+                }
+                if (this.CPUattemptboard[row][col] === 1) {
+                    wave.setTexture('miss');
+                }
+                if (this.CPUattemptboard[row][col] === 2) {
+                    wave.setTexture('hit');
+                }
+                wave.setScale(.05);
+
+                // Center the wave image in the cell
+                wave.setOrigin(0);
+
+                // Store the wave image in the grid
+                Playerarray[row][col] = wave;
+            }
+        }
+
 
     }
 }
