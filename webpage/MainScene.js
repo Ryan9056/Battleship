@@ -9,6 +9,16 @@ class MainScene extends Phaser.Scene {
         this.recentHits = 0;
         this.lastx;
         this.lasty;
+        this.infoboard;
+        this.CPUinfo;
+        this.textStyle = {
+            font: '28px Arial',  // Font and size
+            fill: 'Black',     // Text color (white)
+            align: 'center',     // Align text in the center
+            stroke: '#000000',   // Optional: stroke color (black)
+            strokeThickness: 2   // Optional: stroke thickness
+        };
+        this.isOver = 0;
     }
 
     preload() {
@@ -59,7 +69,7 @@ class MainScene extends Phaser.Scene {
                 // Center the wave image in the cell
                 wave.setOrigin(0)
                     .setInteractive()
-                    .on('pointerdown', () => this.onClick(row, col, wave))
+                    .on('pointerdown', () => this.onClickWave(row, col, wave))
                     .on('pointerover', () => this.enterButtonHoverState(wave))
                     .on('pointerout', () => this.enterButtonRestState(wave));
 
@@ -68,6 +78,18 @@ class MainScene extends Phaser.Scene {
                 CPUarray[row][col] = wave;
             }
         }
+
+
+        this.infoboard = this.add.text(160, 340, "BattleShip", this.textStyle)
+        this.CPUinfo = this.add.text(160, 740, "CPU", this.textStyle)
+        this.infoboard.setOrigin(0.5, 0.5);
+        this.CPUinfo.setOrigin(0.5, 0.5);
+
+        this.infoboard.on('pointerdown', () => this.onClickInfo())
+            .on('pointerover', () => this.enterButtonHoverStateInfo())
+            .on('pointerout', () => this.enterButtonRestStateInfo());
+
+
 
 
         const Playerarray = Array.from({ length: 10 }, () => Array(10).fill(0));
@@ -99,12 +121,14 @@ class MainScene extends Phaser.Scene {
 
     }
 
-    onClick(x, y, wave) {
-        if (this.Playerattemptboard[x][y] != 1 && this.Playerattemptboard[x][y] != 2) {
-            this.gameChecks(x, y, wave);
-            this.CPUmove(wave);
+    onClickWave(x, y, wave) {
+        if (this.isOver === 0) {
+            if (this.Playerattemptboard[x][y] != 1 && this.Playerattemptboard[x][y] != 2) {
+                this.gameChecks(x, y, wave);
+                this.CPUmove(wave);
+            }
         }
-        wave.disableInteractive(false);
+        wave.disableInteractive();
         wave.clearTint();
 
     }
@@ -116,6 +140,31 @@ class MainScene extends Phaser.Scene {
 
     enterButtonRestState(wave) {
         wave.clearTint();
+    }
+
+    onClickInfo() {
+        this.CPUboard = Array.from({ length: 10 }, () => Array(10).fill(0));;
+        this.Playerboard = Array.from({ length: 10 }, () => Array(10).fill(0));;
+        this.Playerattemptboard = Array.from({ length: 10 }, () => Array(10).fill(0));
+        this.CPUattemptboard = Array.from({ length: 10 }, () => Array(10).fill(0));
+        this.recentHits = 0;
+        this.lastx;
+        this.lasty;
+        this.infoboard;
+        this.CPUinfo;
+        this.scene.restart();
+        this.infoboard.disableInteractive();
+        this.infoboard.clearTint();
+
+    }
+
+    enterButtonHoverStateInfo() {
+        this.infoboard.clearTint();
+        this.infoboard.setTintFill("Gray");
+    }
+
+    enterButtonRestStateInfo() {
+        this.infoboard.clearTint();
     }
 
     generateBoards() {
@@ -175,23 +224,17 @@ class MainScene extends Phaser.Scene {
         if (this.CPUboard[x][y] == 0) {
             this.Playerattemptboard[x][y] = 1;
             wave.setTexture('miss');
-            console.log("miss");
+            this.infoboard.setText("Miss")
         } else if (this.CPUboard[x][y] == 1) {
             this.Playerattemptboard[x][y] = 2;
             wave.setTexture('hit');
-            console.log("hit");
+            this.infoboard.setText("Hit")
             if (this.Playerattemptboard.flat().filter(x => x === 2).length >= 17) {
-                //win 
-                console.log("win");
+                this.gameEnd("w");
             }
         }
 
     }
-
-
-
-
-
 
 
 
@@ -259,17 +302,16 @@ class MainScene extends Phaser.Scene {
 
         if (this.Playerboard[x][y] == 0) {
             this.CPUattemptboard[x][y] = 1;
-            console.log("CPU miss");
+            this.CPUinfo.setText("CPU: Miss")
             this.recentHits = this.recentHits - 2;
         } else if (this.Playerboard[x][y] == 1) {
             this.CPUattemptboard[x][y] = 2;
-            console.log("CPU hit");
+            this.CPUinfo.setText("CPU: Hit")
             this.recentHits = 4;
             this.lastx = x;
             this.lasty = y;
             if (this.CPUattemptboard.flat().filter(x => x === 2).length >= 17) {
-                //lose
-                console.log("lose");
+                this.gameEnd("l");
             }
         }
         const Playerarray = Array.from({ length: 10 }, () => Array(10).fill(0));
@@ -302,6 +344,52 @@ class MainScene extends Phaser.Scene {
 
 
     }
+
+    gameEnd(outcome) {
+        this.isOver = 1;
+
+        const CPUarray = Array.from({ length: 10 }, () => Array(10).fill(0));
+
+        // Iterate over the grid and assign the wave image to each cell
+        for (let row = 0; row < 10; row++) {
+            for (let col = 0; col < 10; col++) {
+                // Add the wave image to the scene at the correct position
+                const x = col * 32;
+                const y = row * 32;
+                const wave = this.add.image(x, y, "ocean");
+
+                if (this.Playerattemptboard[row][col] === 1) {
+                    wave.setTexture('miss');
+                }
+                if (this.Playerattemptboard[row][col] === 2) {
+                    wave.setTexture('hit');
+                }
+
+                wave.disableInteractive();
+
+                wave.setScale(.05);
+
+                // Center the wave image in the cell
+                wave.setOrigin(0);
+
+                // Store the wave image in the grid
+                CPUarray[row][col] = wave;
+            }
+        }
+
+
+        if (outcome = "l") {
+            this.infoboard.setText("You Lose! Restart?")
+            this.CPUinfo.setText(" ")
+            this.infoboard.setInteractive();
+        } else if (outcome = "w") {
+            this.infoboard.setText("You Win! Restart?")
+            this.CPUinfo.setText(" ")
+            this.infoboard.setInteractive();
+        }
+
+    }
+
 }
 
 
@@ -315,7 +403,7 @@ class MainScene extends Phaser.Scene {
 
 new Phaser.Game({
     width: 400,
-    height: 720,
+    height: 800,
     backgroundColor: 0xffffff,
     scene: MainScene,
     physics: { default: 'arcade' },
