@@ -231,7 +231,7 @@ class MainScene extends Phaser.Scene {
             wave.setTexture('hit');
             this.infoboard.setText("Hit")
             if (this.Playerattemptboard.flat().filter(x => x === 2).length >= 17) {
-                this.gameEnd("w");
+                this.gameEnd(2);
             }
         }
 
@@ -311,8 +311,9 @@ class MainScene extends Phaser.Scene {
             this.recentHits = 4;
             this.lastx = x;
             this.lasty = y;
+            this.isOver = 0;
             if (this.CPUattemptboard.flat().filter(x => x === 2).length >= 17) {
-                this.gameEnd("l");
+                this.gameEnd(1);
             }
         }
         const Playerarray = Array.from({ length: 10 }, () => Array(10).fill(0));
@@ -379,11 +380,11 @@ class MainScene extends Phaser.Scene {
         }
 
 
-        if (outcome = "l") {
+        if (outcome === 1) {
             this.infoboard.setText("You Lose! Restart?")
             this.CPUinfo.setText(" ")
             this.infoboard.setInteractive();
-        } else if (outcome = "w") {
+        } else if (outcome === 2) {
             this.infoboard.setText("You Win! Restart?")
             this.CPUinfo.setText(" ")
             this.infoboard.setInteractive();
