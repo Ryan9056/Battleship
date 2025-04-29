@@ -20,6 +20,8 @@ class MainScene extends Phaser.Scene {
         };
         this.isOver = 0;
         this.winAmount = 0;
+        this.playerWins = 0;
+        this.cpuWins = 0;
     }
 
     preload() {
@@ -31,11 +33,16 @@ class MainScene extends Phaser.Scene {
 
     }
 
-    create() {
-
-
-        this.winAmount = this.add.text(160, 840, "test", this.textStyle)
-        this.winAmount.setOrigin(0.5, 0.5);
+    async create() {
+        // Load initial win counts
+        try {
+            const response = await fetch('/api/wins');
+            const data = await response.json();
+            this.playerWins = data.playerWins;
+            this.cpuWins = data.cpuWins;
+        } catch (error) {
+            console.error('Error loading win counts:', error);
+        }
 
         this.CPUboard = this.generateBoards();
         this.Playerboard = this.generateBoards();
@@ -62,8 +69,8 @@ class MainScene extends Phaser.Scene {
         for (let row = 0; row < 10; row++) {
             for (let col = 0; col < 10; col++) {
                 // Add the wave image to the scene at the correct position
-                const x = col * 32;
-                const y = row * 32;
+                const x = col * 32 + 100;
+                const y = row * 32 + 100;
 
                 const wave = this.add.image(x, y, "ocean");
 
@@ -84,10 +91,16 @@ class MainScene extends Phaser.Scene {
         }
 
 
-        this.infoboard = this.add.text(160, 340, "BattleShip", this.textStyle)
-        this.CPUinfo = this.add.text(160, 740, "CPU", this.textStyle)
+        this.infoboard = this.add.text(260, 50, "Player", this.textStyle)
+        this.CPUinfo = this.add.text(660, 50, "CPU", this.textStyle)
         this.infoboard.setOrigin(0.5, 0.5);
         this.CPUinfo.setOrigin(0.5, 0.5);
+
+        // Add win count displays under each grid
+        this.playerWinText = this.add.text(260, 450, `Wins: ${this.playerWins}`, this.textStyle);
+        this.cpuWinText = this.add.text(660, 450, `Wins: ${this.cpuWins}`, this.textStyle);
+        this.playerWinText.setOrigin(0.5, 0.5);
+        this.cpuWinText.setOrigin(0.5, 0.5);
 
         this.infoboard.on('pointerdown', () => this.onClickInfo())
             .on('pointerover', () => this.enterButtonHoverStateInfo())
@@ -101,8 +114,8 @@ class MainScene extends Phaser.Scene {
         for (let row = 0; row < 10; row++) {
             for (let col = 0; col < 10; col++) {
                 // Add the wave image to the scene at the correct position
-                const x = col * 32;
-                const y = row * 32 + 400;
+                const x = col * 32 + 500;
+                const y = row * 32 + 100;
                 const wave = this.add.image(x, y, "ocean");
 
                 if (this.Playerboard[row][col] == 1) {
@@ -321,8 +334,8 @@ class MainScene extends Phaser.Scene {
         for (let row = 0; row < 10; row++) {
             for (let col = 0; col < 10; col++) {
                 // Add the wave image to the scene at the correct position
-                const x = col * 32;
-                const y = row * 32 + 400;
+                const x = col * 32 + 500;
+                const y = row * 32 + 100;
                 const wave = this.add.image(x, y, "ocean");
 
                 if (this.Playerboard[row][col] == 1) {
@@ -347,8 +360,40 @@ class MainScene extends Phaser.Scene {
 
     }
 
+    async updateWins(outcome) {
+        if (outcome === 1) {
+            this.cpuWins++;
+        } else if (outcome === 2) {
+            this.playerWins++;
+        }
+
+        // Update the display under each grid
+        this.playerWinText.setText(`Wins: ${this.playerWins}`);
+        this.cpuWinText.setText(`Wins: ${this.cpuWins}`);
+
+        // Save to API
+        try {
+            const response = await fetch('/api/wins', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    playerWins: this.playerWins,
+                    cpuWins: this.cpuWins
+                })
+            });
+            if (!response.ok) {
+                throw new Error('Failed to update wins');
+            }
+        } catch (error) {
+            console.error('Error saving win counts:', error);
+        }
+    }
+
     gameEnd(outcome) {
         this.isOver = 1;
+        this.updateWins(outcome);
 
         const CPUarray = Array.from({ length: 10 }, () => Array(10).fill(0));
 
@@ -356,8 +401,8 @@ class MainScene extends Phaser.Scene {
         for (let row = 0; row < 10; row++) {
             for (let col = 0; col < 10; col++) {
                 // Add the wave image to the scene at the correct position
-                const x = col * 32;
-                const y = row * 32;
+                const x = col * 32 + 100;
+                const y = row * 32 + 100;
                 const wave = this.add.image(x, y, "ocean");
 
                 if (this.Playerattemptboard[row][col] === 1) {
@@ -404,8 +449,8 @@ class MainScene extends Phaser.Scene {
 
 
 new Phaser.Game({
-    width: 400,
-    height: 900,
+    width: 1000,
+    height: 500,
     backgroundColor: 0xffffff,
     scene: MainScene,
     physics: { default: 'arcade' },
