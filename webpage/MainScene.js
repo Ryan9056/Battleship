@@ -22,6 +22,7 @@ class MainScene extends Phaser.Scene {
         this.winAmount = 0;
         this.playerWins = 0;
         this.cpuWins = 0;
+        this.placementPhase = true;
     }
 
     preload() {
@@ -29,8 +30,6 @@ class MainScene extends Phaser.Scene {
         this.load.image("ship", "assets/ship.png");
         this.load.image("hit", "assets/hit.png");
         this.load.image("miss", "assets/miss.png");
-
-
     }
 
     async create() {
@@ -44,11 +43,10 @@ class MainScene extends Phaser.Scene {
             console.error('Error loading win counts:', error);
         }
 
+        // Generate CPU board
         this.CPUboard = this.generateBoards();
-        this.Playerboard = this.generateBoards();
-
-
-        // Cheat Sheet
+        
+        // Cheat Sheet for CPU board
         for (let row = 0; row < this.CPUboard.length; row++) {
             let rowString = '';
             for (let col = 0; col < this.CPUboard[row].length; col++) {
@@ -57,42 +55,11 @@ class MainScene extends Phaser.Scene {
             console.log(rowString);
         }
 
+        // Create empty CPU grid (not interactive during placement)
+        this.createCPUGrid();
 
-
-
-
-
-
-        const CPUarray = Array.from({ length: 10 }, () => Array(10).fill(0));
-
-        // Iterate over the grid and assign the wave image to each cell
-        for (let row = 0; row < 10; row++) {
-            for (let col = 0; col < 10; col++) {
-                // Add the wave image to the scene at the correct position
-                const x = col * 32 + 100;
-                const y = row * 32 + 100;
-
-                const wave = this.add.image(x, y, "ocean");
-
-
-                wave.setScale(.05);
-
-                // Center the wave image in the cell
-                wave.setOrigin(0)
-                    .setInteractive()
-                    .on('pointerdown', () => this.onClickWave(row, col, wave))
-                    .on('pointerover', () => this.enterButtonHoverState(wave))
-                    .on('pointerout', () => this.enterButtonRestState(wave));
-
-
-                // Store the wave image in the grid
-                CPUarray[row][col] = wave;
-            }
-        }
-
-
-        this.infoboard = this.add.text(260, 50, "Player", this.textStyle)
-        this.CPUinfo = this.add.text(660, 50, "CPU", this.textStyle)
+        this.infoboard = this.add.text(260, 50, "Player", this.textStyle);
+        this.CPUinfo = this.add.text(660, 50, "CPU", this.textStyle);
         this.infoboard.setOrigin(0.5, 0.5);
         this.CPUinfo.setOrigin(0.5, 0.5);
 
@@ -106,34 +73,47 @@ class MainScene extends Phaser.Scene {
             .on('pointerover', () => this.enterButtonHoverStateInfo())
             .on('pointerout', () => this.enterButtonRestStateInfo());
 
+        // Initialize ship placement
+        this.shipPlacement = new ShipPlacement(this);
+        this.shipPlacement.createPlayerGrid();
+    }
 
+    createCPUGrid() {
+        const CPUarray = Array.from({ length: 10 }, () => Array(10).fill(0));
 
-
-        const Playerarray = Array.from({ length: 10 }, () => Array(10).fill(0));
-
+        // Iterate over the grid and assign the wave image to each cell for CPU board
         for (let row = 0; row < 10; row++) {
             for (let col = 0; col < 10; col++) {
                 // Add the wave image to the scene at the correct position
-                const x = col * 32 + 500;
+                const x = col * 32 + 100;
                 const y = row * 32 + 100;
+
                 const wave = this.add.image(x, y, "ocean");
-
-                if (this.Playerboard[row][col] == 1) {
-                    wave.setTexture('ship');
-                }
                 wave.setScale(.05);
-
-                // Center the wave image in the cell
                 wave.setOrigin(0);
-
+                
                 // Store the wave image in the grid
-                Playerarray[row][col] = wave;
+                CPUarray[row][col] = wave;
             }
         }
-
-
+        
+        this.cpuGridArray = CPUarray;
     }
-
+    
+    // Called by ShipPlacement when all ships are placed
+    startGameAfterPlacement() {
+        this.placementPhase = false;
+        
+        // Make CPU grid interactive for attacks
+        for (let row = 0; row < 10; row++) {
+            for (let col = 0; col < 10; col++) {
+                this.cpuGridArray[row][col].setInteractive()
+                    .on('pointerdown', () => this.onClickWave(row, col, this.cpuGridArray[row][col]))
+                    .on('pointerover', () => this.enterButtonHoverState(this.cpuGridArray[row][col]))
+                    .on('pointerout', () => this.enterButtonRestState(this.cpuGridArray[row][col]));
+            }
+        }
+    }
 
     onClickWave(x, y, wave) {
         if (this.isOver === 0) {
@@ -144,7 +124,6 @@ class MainScene extends Phaser.Scene {
         }
         wave.disableInteractive();
         wave.clearTint();
-
     }
 
     enterButtonHoverState(wave) {
@@ -169,7 +148,6 @@ class MainScene extends Phaser.Scene {
         this.scene.restart();
         this.infoboard.disableInteractive();
         this.infoboard.clearTint();
-
     }
 
     enterButtonHoverStateInfo() {
@@ -247,11 +225,7 @@ class MainScene extends Phaser.Scene {
                 this.gameEnd(2);
             }
         }
-
     }
-
-
-
 
     CPUmove() {
         let x;
@@ -298,11 +272,8 @@ class MainScene extends Phaser.Scene {
                     break;
                 }
 
-
                 console.log(this.recentHits);
-
             }
-
         }
         if (smartpick != 1) {
             x = Math.floor(Math.random() * 10);
@@ -356,8 +327,6 @@ class MainScene extends Phaser.Scene {
                 Playerarray[row][col] = wave;
             }
         }
-
-
     }
 
     async updateWins(outcome) {
@@ -424,7 +393,6 @@ class MainScene extends Phaser.Scene {
             }
         }
 
-
         if (outcome === 1) {
             this.infoboard.setText("You Lose! Restart?")
             this.CPUinfo.setText(" ")
@@ -434,19 +402,8 @@ class MainScene extends Phaser.Scene {
             this.CPUinfo.setText(" ")
             this.infoboard.setInteractive();
         }
-
     }
-
 }
-
-
-
-
-
-
-
-
-
 
 new Phaser.Game({
     width: 1000,

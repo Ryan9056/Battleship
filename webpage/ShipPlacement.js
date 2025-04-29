@@ -1,0 +1,177 @@
+class ShipPlacement {
+    constructor(scene) {
+        this.scene = scene;
+        this.shipSizes = [5, 4, 3, 3, 2];
+        this.currentShipIndex = 0;
+        this.currentShipOrientation = "horizontal"; 
+        this.playerShipCells = []; 
+        this.playerGridArray = [];
+        this.hoverRow = undefined;
+        this.hoverCol = undefined;
+        this.placementPhase = true;
+        
+        // Add instruction text
+        this.placementText = this.scene.add.text(500, 20, `Place your ${this.shipSizes[this.currentShipIndex]}-length ship. Press R to rotate.`, {
+            font: '20px Arial',
+            fill: 'Black',
+            align: 'center'
+        });
+        this.placementText.setOrigin(0.5, 0.5);
+        
+        // Add key for rotation
+        this.scene.input.keyboard.on('keydown-R', () => {
+            this.currentShipOrientation = this.currentShipOrientation === "horizontal" ? "vertical" : "horizontal";
+            this.updatePlacementPreview();
+        });
+    }
+    
+    createPlayerGrid() {
+        const Playerarray = Array.from({ length: 10 }, () => Array(10).fill(0));
+
+        for (let row = 0; row < 10; row++) {
+            for (let col = 0; col < 10; col++) {
+                // Add the wave image to the scene at the correct position
+                const x = col * 32 + 500;
+                const y = row * 32 + 100;
+                const wave = this.scene.add.image(x, y, "ocean");
+                
+                wave.setScale(.05);
+                wave.setOrigin(0);
+                
+                // Make cells interactive during placement phase
+                wave.setInteractive()
+                    .on('pointerdown', () => this.placeShip(row, col))
+                    .on('pointerover', () => this.showPlacementPreview(row, col))
+                    .on('pointerout', () => this.clearPlacementPreview());
+                
+                // Store the wave image in the grid
+                Playerarray[row][col] = wave;
+            }
+        }
+        
+        this.playerGridArray = Playerarray;
+    }
+    
+    // Preview ship placement when hovering
+    showPlacementPreview(row, col) {
+        this.hoverRow = row;
+        this.hoverCol = col;
+        this.updatePlacementPreview();
+    }
+    
+    updatePlacementPreview() {
+        // Clear previous previews
+        this.clearPlacementPreview();
+        
+        if (this.hoverRow === undefined || this.hoverCol === undefined) return;
+        
+        const shipSize = this.shipSizes[this.currentShipIndex];
+        const isValid = this.isValidPlacement(this.hoverRow, this.hoverCol, shipSize, this.currentShipOrientation);
+        
+        // Show preview
+        for (let i = 0; i < shipSize; i++) {
+            let row = this.hoverRow;
+            let col = this.hoverCol;
+            
+            if (this.currentShipOrientation === "horizontal") {
+                col += i;
+            } else {
+                row += i;
+            }
+            
+            if (row >= 0 && row < 10 && col >= 0 && col < 10) {
+                const cell = this.playerGridArray[row][col];
+                if (isValid) {
+                    cell.setTintFill(0x00FF00); // Green for valid
+                } else {
+                    cell.setTintFill(0xFF0000); // Red for invalid
+                }
+            }
+        }
+    }
+    
+    clearPlacementPreview() {
+        for (let row = 0; row < 10; row++) {
+            for (let col = 0; col < 10; col++) {
+                this.playerGridArray[row][col].clearTint();
+            }
+        }
+        
+        // Redraw already placed ships
+        this.playerShipCells.forEach(cell => {
+            const { row, col } = cell;
+            this.playerGridArray[row][col].setTexture('ship');
+        });
+    }
+    
+    isValidPlacement(startRow, startCol, size, orientation) {
+        for (let i = 0; i < size; i++) {
+            let row = startRow;
+            let col = startCol;
+            
+            if (orientation === "horizontal") {
+                col += i;
+            } else {
+                row += i;
+            }
+            
+            // Check if out of bounds
+            if (row < 0 || row >= 10 || col < 0 || col >= 10) {
+                return false;
+            }
+            
+            // Check if cell already has a ship
+            if (this.scene.Playerboard[row][col] === 1) {
+                return false;
+            }
+        }
+        
+        return true;
+    }
+    
+    // Place ship when player clicks
+    placeShip(row, col) {
+        const shipSize = this.shipSizes[this.currentShipIndex];
+        if (this.isValidPlacement(row, col, shipSize, this.currentShipOrientation)) {
+            // Place the ship
+            for (let i = 0; i < shipSize; i++) {
+                let shipRow = row;
+                let shipCol = col;
+                
+                if (this.currentShipOrientation === "horizontal") {
+                    shipCol += i;
+                } else {
+                    shipRow += i;
+                }
+                
+                // Update player board
+                this.scene.Playerboard[shipRow][shipCol] = 1;
+                
+                // Update visuals
+                this.playerGridArray[shipRow][shipCol].setTexture('ship');
+                
+                // Track for redrawing
+                this.playerShipCells.push({ row: shipRow, col: shipCol });
+            }
+            
+            // Move to next ship
+            this.currentShipIndex++;
+            
+            if (this.currentShipIndex >= this.shipSizes.length) {
+                // All ships placed, start game
+                this.finishPlacement();
+            } else {
+                // Update text for next ship
+                this.placementText.setText(`Place your ${this.shipSizes[this.currentShipIndex]}-length ship. Press R to rotate.`);
+            }
+        }
+    }
+    
+    finishPlacement() {
+        this.placementPhase = false;
+        this.placementText.setText("Game started! Click on CPU grid to attack.");
+        
+        // Signal to MainScene that placement is complete
+        this.scene.startGameAfterPlacement();
+    }
+} 
