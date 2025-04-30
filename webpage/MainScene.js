@@ -371,24 +371,20 @@ class MainScene extends Phaser.Scene {
                 y = this.lasty;
 
                 ran = Math.floor(Math.random() * 4);
-                console.log("random number" + ran);
 
                 if (ran === 0) {
                     x++;
-                    console.log("x++")
                 } else if (ran == 1) {
                     x--;
-                    console.log("x--")
                 } else if (ran === 2) {
                     y++;
-                    console.log("y++")
                 } else if (ran === 3) {
                     y--;
-                    console.log("y--")
                 }
 
                 if (!(x < 0 || x >= this.CPUattemptboard.length || y < 0 || y >= this.CPUattemptboard[x].length || this.CPUattemptboard[x][y] === 1 || this.CPUattemptboard[x][y] === 2)) {
                     smartpick = 1;
+                    console.log("CPU Smartpick")
                     loop = false;
                     break;
                 }
@@ -400,7 +396,7 @@ class MainScene extends Phaser.Scene {
                     break;
                 }
 
-                console.log(this.recentHits);
+                
             }
         }
         if (smartpick != 1) {
@@ -419,7 +415,7 @@ class MainScene extends Phaser.Scene {
             this.recentHits = this.recentHits - 2;
         } else if (this.Playerboard[x][y] == 1) {
             this.CPUattemptboard[x][y] = 2;
-            this.CPUinfo.setText("CPU: Hit")
+            this.CPUinfo.setText("CPU: Hit");
             this.recentHits = 4;
             this.lastx = x;
             this.lasty = y;
@@ -436,7 +432,7 @@ class MainScene extends Phaser.Scene {
                 const y = this.gridsY + (row * this.cellSize);
                 const wave = this.add.image(x, y, "ocean");
 
-                if (this.Playerboard[row][col] == 1) {
+                if (this.Playerboard[row][col] == 1 && this.CPUattemptboard[row][col] != 2) {
                     wave.setTexture('ship');
                     wave.setTint(this.tintManager.currentShipTint);
                 } else if (this.CPUattemptboard[row][col] === 1) {
