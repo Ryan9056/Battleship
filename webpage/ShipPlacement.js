@@ -40,8 +40,9 @@ class ShipPlacement {
                 const y = this.scene.gridsY + (row * this.scene.cellSize);
                 const wave = this.scene.add.image(x, y, "ocean");
                 
-                wave.setScale(.05);
+                wave.setScale(0.05); // Original scale
                 wave.setOrigin(0);
+                wave.setDepth(1); // Set depth so grid lines can appear on top
                 
                 // Make cells interactive during placement phase
                 wave.setInteractive()

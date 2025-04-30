@@ -10,7 +10,7 @@
     <style>
         body {
             margin: 0;
-            padding: 20px;
+            padding: 10px;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -18,12 +18,14 @@
             min-height: 100vh;
             font-family: Arial, sans-serif;
             background-color: #f0f8ff;
+            overflow: hidden;
         }
         h1 {
             color: #003366;
             text-align: center;
-            margin-bottom: 20px;
-            font-size: 48px;
+            margin-bottom: 15px;
+            margin-top: 5px;
+            font-size: 42px;
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
         }
         #game-container {
@@ -31,11 +33,15 @@
             justify-content: center;
             align-items: center;
             margin: 0 auto;
+            max-width: 100%;
+            max-height: calc(100vh - 80px);
         }
         canvas {
             border: 3px solid #003366;
             border-radius: 8px;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            max-width: 100%;
+            max-height: 100%;
         }
     </style>
 </head>

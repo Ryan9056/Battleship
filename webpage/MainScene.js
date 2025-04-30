@@ -33,11 +33,11 @@ class MainScene extends Phaser.Scene {
         this.updateTimer = 0;
         this.currentOceanTint = Phaser.Display.Color.GetColor(255, 255, 255);
         
-        // Define grid dimensions
+        // Revert to original grid dimensions
         this.gridSize = 10;
-        this.cellSize = 32;
+        this.cellSize = 32; // Original cell size
         this.gridWidth = this.gridSize * this.cellSize;
-        this.gridSpacing = 120; // Space between the two grids
+        this.gridSpacing = 100; // Original spacing
     }
 
     preload() {
@@ -65,8 +65,16 @@ class MainScene extends Phaser.Scene {
         this.leftGridX = (this.canvasWidth - totalGridsWidth) / 2;
         this.rightGridX = this.leftGridX + this.gridWidth + this.gridSpacing;
         
-        // Y position (centered vertically but with space for headers/footers)
-        this.gridsY = 150;
+        // Y position (centered vertically in the available space)
+        // Calculate available height (total height minus space for headers/footers)
+        const headerFooterSpace = 160; // Space for headers, footers, and margins
+        const availableHeight = this.canvasHeight - headerFooterSpace;
+        this.gridsY = (this.canvasHeight - this.gridWidth) / 2;
+        
+        // If grids are too low, adjust upward
+        if (this.gridsY + this.gridWidth > this.canvasHeight - 60) {
+            this.gridsY = this.canvasHeight - this.gridWidth - 60;
+        }
         
         // Load initial win counts
         try {
@@ -121,7 +129,7 @@ class MainScene extends Phaser.Scene {
 
         // Add time display (keeping original position as requested)
         this.timeText = this.add.text(
-            500, 
+            this.canvasWidth / 2, // Center horizontally based on new width (1100px)
             20, 
             this.formatTime(this.currentTime.hour, this.currentTime.minute), 
             this.textStyle
@@ -151,6 +159,14 @@ class MainScene extends Phaser.Scene {
         // Initialize ship placement
         this.shipPlacement = new ShipPlacement(this);
         this.shipPlacement.createPlayerGrid();
+        
+        // Set up timer to update both grids regularly
+        this.time.addEvent({
+            delay: 2000, // Update every 2 seconds
+            callback: this.updateBothGrids,
+            callbackScope: this,
+            loop: true
+        });
     }
 
     formatTime(hour, minute) {
@@ -231,7 +247,8 @@ class MainScene extends Phaser.Scene {
             }
         }
         
-        // Update player grid textures via ShipPlacement if needed
+        // Update player grid textures - only during placement phase
+        // During game phase, player grid is recreated in CPUmove
         if (this.shipPlacement && this.placementPhase) {
             this.shipPlacement.refreshWaveTextures(this.currentOceanTint);
         }
@@ -248,8 +265,9 @@ class MainScene extends Phaser.Scene {
                 const y = this.gridsY + (row * this.cellSize);
 
                 const wave = this.add.image(x, y, "ocean");
-                wave.setScale(.05);
+                wave.setScale(0.05); // Original scale
                 wave.setOrigin(0);
+                wave.setDepth(1); // Set depth to 1 for waves
                 
                 // Store the wave image in the grid
                 CPUarray[row][col] = wave;
@@ -257,6 +275,51 @@ class MainScene extends Phaser.Scene {
         }
         
         this.cpuGridArray = CPUarray;
+        
+        // Draw grid lines AFTER creating the ocean tiles, with higher depth
+        this.drawGridLines();
+    }
+    
+    // Create a separate method to draw grid lines with higher visibility
+    drawGridLines() {
+        // Create a graphics object for grid lines with higher depth
+        if (this.gridLines) {
+            this.gridLines.clear();
+            this.gridLines.destroy();
+        }
+        
+        this.gridLines = this.add.graphics();
+        this.gridLines.setDepth(10); // Higher depth to ensure visibility
+        this.gridLines.lineStyle(1, 0xFFFFFF, 1); // Simple 1px white lines
+        
+        // Draw simple grid lines for CPU grid (left side)
+        for (let i = 0; i <= 10; i++) {
+            // Horizontal lines
+            const y = this.gridsY + (i * this.cellSize);
+            this.gridLines.moveTo(this.leftGridX, y);
+            this.gridLines.lineTo(this.leftGridX + (10 * this.cellSize), y);
+            
+            // Vertical lines
+            const x = this.leftGridX + (i * this.cellSize);
+            this.gridLines.moveTo(x, this.gridsY);
+            this.gridLines.lineTo(x, this.gridsY + (10 * this.cellSize));
+        }
+        
+        // Draw simple grid lines for Player grid (right side)
+        for (let i = 0; i <= 10; i++) {
+            // Horizontal lines
+            const y = this.gridsY + (i * this.cellSize);
+            this.gridLines.moveTo(this.rightGridX, y);
+            this.gridLines.lineTo(this.rightGridX + (10 * this.cellSize), y);
+            
+            // Vertical lines
+            const x = this.rightGridX + (i * this.cellSize);
+            this.gridLines.moveTo(x, this.gridsY);
+            this.gridLines.lineTo(x, this.gridsY + (10 * this.cellSize));
+        }
+        
+        // Stroke the lines
+        this.gridLines.strokePath();
     }
     
     // Called by ShipPlacement when all ships are placed
@@ -477,15 +540,26 @@ class MainScene extends Phaser.Scene {
                 if (this.CPUattemptboard[row][col] === 2) {
                     wave.setTexture('hit');
                 }
-                wave.setScale(.05);
-
-                // Center the wave image in the cell
+                
+                wave.setScale(0.05); // Original scale
                 wave.setOrigin(0);
+                wave.setDepth(1); // Set depth to 1 for all tiles
+                
+                // Apply current ocean tint to water tiles
+                if (wave.texture.key === 'ocean') {
+                    wave.setTint(this.currentOceanTint);
+                }
 
                 // Store the wave image in the grid
                 Playerarray[row][col] = wave;
             }
         }
+        
+        // Store the player grid array for future tint updates
+        this.playerGridArray = Playerarray;
+        
+        // Redraw the grid lines on top of all tiles
+        this.drawGridLines();
     }
 
     async updateWins(outcome) {
@@ -522,9 +596,9 @@ class MainScene extends Phaser.Scene {
     gameEnd(outcome) {
         this.isOver = 1;
         this.updateWins(outcome);
-
+        
         const CPUarray = Array.from({ length: 10 }, () => Array(10).fill(0));
-
+        
         // Iterate over the grid and assign the wave image to each cell
         for (let row = 0; row < 10; row++) {
             for (let col = 0; col < 10; col++) {
@@ -532,26 +606,35 @@ class MainScene extends Phaser.Scene {
                 const x = this.leftGridX + (col * this.cellSize);
                 const y = this.gridsY + (row * this.cellSize);
                 const wave = this.add.image(x, y, "ocean");
-
+                
                 if (this.Playerattemptboard[row][col] === 1) {
                     wave.setTexture('miss');
                 }
                 if (this.Playerattemptboard[row][col] === 2) {
                     wave.setTexture('hit');
                 }
-
+                
                 wave.disableInteractive();
-
-                wave.setScale(.05);
-
-                // Center the wave image in the cell
+                wave.setScale(0.05); // Original scale
                 wave.setOrigin(0);
-
+                wave.setDepth(1); // Set depth to 1 for all tiles
+                
+                // Apply current ocean tint to water tiles
+                if (wave.texture.key === 'ocean') {
+                    wave.setTint(this.currentOceanTint);
+                }
+                
                 // Store the wave image in the grid
                 CPUarray[row][col] = wave;
             }
         }
-
+        
+        // Replace the CPU grid array for future tint updates
+        this.cpuGridArray = CPUarray;
+        
+        // Redraw grid lines with higher visibility
+        this.drawGridLines();
+        
         if (outcome === 1) {
             this.infoboard.setText("You Lose! Restart?")
             this.CPUinfo.setText(" ")
@@ -576,11 +659,40 @@ class MainScene extends Phaser.Scene {
         this.shutdown();
         super.destroy();
     }
+
+    // This method will be called on a timer to update both grids
+    updateBothGrids() {
+        // Update CPU grid
+        if (this.cpuGridArray) {
+            for (let row = 0; row < 10; row++) {
+                for (let col = 0; col < 10; col++) {
+                    const cell = this.cpuGridArray[row][col];
+                    if (cell.texture.key === 'ocean') {
+                        cell.clearTint();
+                        cell.setTint(this.currentOceanTint);
+                    }
+                }
+            }
+        }
+        
+        // Update player grid (if we're in game phase)
+        if (!this.placementPhase && this.playerGridArray) {
+            for (let row = 0; row < 10; row++) {
+                for (let col = 0; col < 10; col++) {
+                    const cell = this.playerGridArray[row][col];
+                    if (cell && cell.texture.key === 'ocean') {
+                        cell.clearTint();
+                        cell.setTint(this.currentOceanTint);
+                    }
+                }
+            }
+        }
+    }
 }
 
 new Phaser.Game({
-    width: 1000,
-    height: 600,
+    width: 950,
+    height: 550,
     backgroundColor: 0xffffff,
     scene: MainScene,
     physics: { default: 'arcade' },
