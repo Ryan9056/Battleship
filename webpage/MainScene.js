@@ -43,8 +43,8 @@ class MainScene extends Phaser.Scene {
     // Preload all game assets including ships, hits, misses, and ocean textures
     preload() {
         this.load.image("ship", "assets/ship.png");
-        this.load.image("hit", "assets/hit.png");
-        this.load.image("miss", "assets/miss.png");
+        this.load.image("hit", "assets/Hit.png");
+        this.load.image("miss", "assets/Miss.png");
         this.load.image("ocean", "assets/ocean.png");
     }
 
