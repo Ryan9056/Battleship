@@ -17,7 +17,7 @@ class TintManager {
         // Initial tint update
         await this.updateOceanTint();
         
-        this.updateTimer = setInterval(() => this.updateOceanTint(), 10);
+        this.updateTimer = setInterval(() => this.updateOceanTint(), 50000);
         
         return this;
     }

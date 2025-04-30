@@ -70,7 +70,7 @@ class MainScene extends Phaser.Scene {
         await this.tintManager.initialize();
         
         try {
-            const response = await fetch('/api/wins');
+            const response = await fetch('/Battleship/wins.json');
             const data = await response.json();
             this.playerWins = data.playerWins;
             this.cpuWins = data.cpuWins;
@@ -470,7 +470,7 @@ class MainScene extends Phaser.Scene {
         this.cpuWinText.setText(`Wins: ${this.cpuWins}`);
 
         try {
-            const response = await fetch('/api/wins', {
+            const response = await fetch('/Battleship/wins.json', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

@@ -1,6 +1,5 @@
 {
   "dependencies": {
-    "express": "^5.1.0",
-    "jimp": "^0.22.12"
+    "express": "^5.1.0"
   }
 }
