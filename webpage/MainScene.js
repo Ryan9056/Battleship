@@ -18,21 +18,56 @@ class MainScene extends Phaser.Scene {
             stroke: '#000000',   
             strokeThickness: 2   
         };
+        this.smallTextStyle = {
+            font: '18px Arial',
+            fill: 'Black', 
+            align: 'center'
+        };
         this.isOver = 0;
         this.winAmount = 0;
         this.playerWins = 0;
         this.cpuWins = 0;
         this.placementPhase = true;
+        this.timeText = null;
+        this.waveTexture = null;
+        this.updateTimer = 0;
+        this.currentOceanTint = Phaser.Display.Color.GetColor(255, 255, 255);
+        
+        // Define grid dimensions
+        this.gridSize = 10;
+        this.cellSize = 32;
+        this.gridWidth = this.gridSize * this.cellSize;
+        this.gridSpacing = 120; // Space between the two grids
     }
 
     preload() {
-        this.load.image("ocean", "assets/ocean.png");
         this.load.image("ship", "assets/ship.png");
         this.load.image("hit", "assets/hit.png");
         this.load.image("miss", "assets/miss.png");
+        
+        // Load the static ocean image
+        this.load.image("ocean", "assets/ocean.png");
+        
+        // Set up interval to check time and update tint
+        this.oceanTintTimer = setInterval(() => this.updateOceanTint(), 60000); // every minute
+        this.updateOceanTint(); // Initial call
     }
 
     async create() {
+        // Calculate grid positions to center in the canvas
+        this.canvasWidth = this.sys.game.config.width;
+        this.canvasHeight = this.sys.game.config.height;
+        
+        // The total width taken by both grids and the spacing between them
+        const totalGridsWidth = (this.gridWidth * 2) + this.gridSpacing;
+        
+        // Calculate the starting X position to center both grids
+        this.leftGridX = (this.canvasWidth - totalGridsWidth) / 2;
+        this.rightGridX = this.leftGridX + this.gridWidth + this.gridSpacing;
+        
+        // Y position (centered vertically but with space for headers/footers)
+        this.gridsY = 150;
+        
         // Load initial win counts
         try {
             const response = await fetch('/api/wins');
@@ -41,6 +76,16 @@ class MainScene extends Phaser.Scene {
             this.cpuWins = data.cpuWins;
         } catch (error) {
             console.error('Error loading win counts:', error);
+        }
+
+        // Get current time
+        try {
+            const timeResponse = await fetch('/api/time');
+            const timeData = await timeResponse.json();
+            this.currentTime = timeData;
+        } catch (error) {
+            console.error('Error loading time:', error);
+            this.currentTime = { hour: 0, minute: 0, second: 0 };
         }
 
         // Generate CPU board
@@ -58,14 +103,44 @@ class MainScene extends Phaser.Scene {
         // Create empty CPU grid (not interactive during placement)
         this.createCPUGrid();
 
-        this.infoboard = this.add.text(260, 50, "Player", this.textStyle);
-        this.CPUinfo = this.add.text(660, 50, "CPU", this.textStyle);
+        // Center the headers above each grid
+        this.infoboard = this.add.text(
+            this.leftGridX + (this.gridWidth / 2), 
+            this.gridsY - 50, 
+            "Player", 
+            this.textStyle
+        );
+        this.CPUinfo = this.add.text(
+            this.rightGridX + (this.gridWidth / 2), 
+            this.gridsY - 50, 
+            "CPU", 
+            this.textStyle
+        );
         this.infoboard.setOrigin(0.5, 0.5);
         this.CPUinfo.setOrigin(0.5, 0.5);
 
+        // Add time display (keeping original position as requested)
+        this.timeText = this.add.text(
+            500, 
+            20, 
+            this.formatTime(this.currentTime.hour, this.currentTime.minute), 
+            this.textStyle
+        );
+        this.timeText.setOrigin(0.5, 0.5);
+
         // Add win count displays under each grid
-        this.playerWinText = this.add.text(260, 450, `Wins: ${this.playerWins}`, this.textStyle);
-        this.cpuWinText = this.add.text(660, 450, `Wins: ${this.cpuWins}`, this.textStyle);
+        this.playerWinText = this.add.text(
+            this.leftGridX + (this.gridWidth / 2), 
+            this.gridsY + this.gridWidth + 50, 
+            `Wins: ${this.playerWins}`, 
+            this.textStyle
+        );
+        this.cpuWinText = this.add.text(
+            this.rightGridX + (this.gridWidth / 2), 
+            this.gridsY + this.gridWidth + 50, 
+            `Wins: ${this.cpuWins}`, 
+            this.textStyle
+        );
         this.playerWinText.setOrigin(0.5, 0.5);
         this.cpuWinText.setOrigin(0.5, 0.5);
 
@@ -78,6 +153,90 @@ class MainScene extends Phaser.Scene {
         this.shipPlacement.createPlayerGrid();
     }
 
+    formatTime(hour, minute) {
+        const period = hour >= 12 ? 'PM' : 'AM';
+        const displayHour = hour % 12 || 12; // Convert to 12-hour format
+        const displayMinute = minute.toString().padStart(2, '0');
+        return `${displayHour}:${displayMinute} ${period}`;
+    }
+
+    updateOceanTint() {
+        // Get current time to calculate appropriate tint
+        fetch('/api/time')
+            .then(response => response.json())
+            .then(timeData => {
+                // Update time display
+                this.currentTime = timeData;
+                if (this.timeText) {
+                    this.timeText.setText(this.formatTime(timeData.hour, timeData.minute));
+                }
+                
+                // Calculate tint based on time
+                const hour = timeData.hour;
+                let blueIntensity;
+                
+                if (hour >= 6 && hour < 18) {
+                    // 6am to 6pm: gradually get lighter
+                    const minutesSince6am = (hour - 6) * 60 + timeData.minute;
+                    const totalMinutes = 12 * 60; // 12 hours in minutes
+                    blueIntensity = 100 + (155 * minutesSince6am / totalMinutes);
+                } else {
+                    // 6pm to 6am: gradually get darker
+                    let minutesSince6pm;
+                    if (hour >= 18) {
+                        minutesSince6pm = (hour - 18) * 60 + timeData.minute;
+                    } else {
+                        minutesSince6pm = ((hour + 24) - 18) * 60 + timeData.minute;
+                    }
+                    const totalMinutes = 12 * 60; // 12 hours in minutes
+                    blueIntensity = 255 - (155 * minutesSince6pm / totalMinutes);
+                }
+                
+                blueIntensity = Math.max(100, Math.min(255, Math.floor(blueIntensity)));
+                
+                // Calculate tint color (keep red and green channels at max, adjust blue)
+                const tintColor = Phaser.Display.Color.GetColor(
+                    255,
+                    255,
+                    blueIntensity
+                );
+                
+                // Store the current tint value
+                this.currentOceanTint = tintColor;
+                
+                // Update all ocean tiles with the new tint
+                this.refreshWaveTextures();
+            })
+            .catch(error => {
+                console.error('Error updating time:', error);
+                // Use local time as fallback
+                const now = new Date();
+                if (this.timeText) {
+                    this.timeText.setText(this.formatTime(now.getHours(), now.getMinutes()));
+                }
+            });
+    }
+
+    refreshWaveTextures() {
+        // Update CPU grid textures
+        if (this.cpuGridArray) {
+            for (let row = 0; row < 10; row++) {
+                for (let col = 0; col < 10; col++) {
+                    const cell = this.cpuGridArray[row][col];
+                    if (cell.texture.key === 'ocean') {
+                        cell.clearTint();
+                        cell.setTint(this.currentOceanTint);
+                    }
+                }
+            }
+        }
+        
+        // Update player grid textures via ShipPlacement if needed
+        if (this.shipPlacement && this.placementPhase) {
+            this.shipPlacement.refreshWaveTextures(this.currentOceanTint);
+        }
+    }
+
     createCPUGrid() {
         const CPUarray = Array.from({ length: 10 }, () => Array(10).fill(0));
 
@@ -85,8 +244,8 @@ class MainScene extends Phaser.Scene {
         for (let row = 0; row < 10; row++) {
             for (let col = 0; col < 10; col++) {
                 // Add the wave image to the scene at the correct position
-                const x = col * 32 + 100;
-                const y = row * 32 + 100;
+                const x = this.leftGridX + (col * this.cellSize);
+                const y = this.gridsY + (row * this.cellSize);
 
                 const wave = this.add.image(x, y, "ocean");
                 wave.setScale(.05);
@@ -305,8 +464,8 @@ class MainScene extends Phaser.Scene {
         for (let row = 0; row < 10; row++) {
             for (let col = 0; col < 10; col++) {
                 // Add the wave image to the scene at the correct position
-                const x = col * 32 + 500;
-                const y = row * 32 + 100;
+                const x = this.rightGridX + (col * this.cellSize);
+                const y = this.gridsY + (row * this.cellSize);
                 const wave = this.add.image(x, y, "ocean");
 
                 if (this.Playerboard[row][col] == 1) {
@@ -370,8 +529,8 @@ class MainScene extends Phaser.Scene {
         for (let row = 0; row < 10; row++) {
             for (let col = 0; col < 10; col++) {
                 // Add the wave image to the scene at the correct position
-                const x = col * 32 + 100;
-                const y = row * 32 + 100;
+                const x = this.leftGridX + (col * this.cellSize);
+                const y = this.gridsY + (row * this.cellSize);
                 const wave = this.add.image(x, y, "ocean");
 
                 if (this.Playerattemptboard[row][col] === 1) {
@@ -403,13 +562,27 @@ class MainScene extends Phaser.Scene {
             this.infoboard.setInteractive();
         }
     }
+
+    // Clean up resources when scene is shut down
+    shutdown() {
+        if (this.oceanTintTimer) {
+            clearInterval(this.oceanTintTimer);
+            this.oceanTintTimer = null;
+        }
+    }
+    
+    // Also handle when scene is destroyed
+    destroy() {
+        this.shutdown();
+        super.destroy();
+    }
 }
 
 new Phaser.Game({
     width: 1000,
-    height: 500,
+    height: 600,
     backgroundColor: 0xffffff,
     scene: MainScene,
     physics: { default: 'arcade' },
-    parent: 'game'
+    parent: 'game-container'
 });

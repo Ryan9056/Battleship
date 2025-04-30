@@ -6,10 +6,43 @@
     <title>Battleship</title>
     <script src="phaser.min.js"></script> 
     <script src="ShipPlacement.js"></script>
-    <script src="MainScene.js" ></script> 
+    <script src="MainScene.js" ></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            font-family: Arial, sans-serif;
+            background-color: #f0f8ff;
+        }
+        h1 {
+            color: #003366;
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 48px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+        }
+        #game-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0 auto;
+        }
+        canvas {
+            border: 3px solid #003366;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+    </style>
 </head>
 <body>
-    <h1>Battleship</h1>
-    <div id="game-container"></div> 
+    <h1>BATTLESHIP</h1>
+    <div id="game-container">
+        <!-- The Phaser canvas will be inserted here -->
+    </div>
 </body>
 </html>

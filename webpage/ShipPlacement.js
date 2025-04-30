@@ -10,12 +10,17 @@ class ShipPlacement {
         this.hoverCol = undefined;
         this.placementPhase = true;
         
-        // Add instruction text
-        this.placementText = this.scene.add.text(500, 20, `Place your ${this.shipSizes[this.currentShipIndex]}-length ship. Press R to rotate.`, {
-            font: '20px Arial',
-            fill: 'Black',
-            align: 'center'
-        });
+        // Add instruction text centered at the top of the screen
+        this.placementText = this.scene.add.text(
+            this.scene.canvasWidth / 2, 
+            50, 
+            `Place your ${this.shipSizes[this.currentShipIndex]}-length ship. Press R to rotate.`, 
+            {
+                font: '20px Arial',
+                fill: 'Black',
+                align: 'center'
+            }
+        );
         this.placementText.setOrigin(0.5, 0.5);
         
         // Add key for rotation
@@ -31,8 +36,8 @@ class ShipPlacement {
         for (let row = 0; row < 10; row++) {
             for (let col = 0; col < 10; col++) {
                 // Add the wave image to the scene at the correct position
-                const x = col * 32 + 500;
-                const y = row * 32 + 100;
+                const x = this.scene.rightGridX + (col * this.scene.cellSize);
+                const y = this.scene.gridsY + (row * this.scene.cellSize);
                 const wave = this.scene.add.image(x, y, "ocean");
                 
                 wave.setScale(.05);
@@ -163,6 +168,23 @@ class ShipPlacement {
             } else {
                 // Update text for next ship
                 this.placementText.setText(`Place your ${this.shipSizes[this.currentShipIndex]}-length ship. Press R to rotate.`);
+            }
+        }
+    }
+    
+    refreshWaveTextures(tint) {
+        if (this.playerGridArray) {
+            for (let row = 0; row < 10; row++) {
+                for (let col = 0; col < 10; col++) {
+                    const cell = this.playerGridArray[row][col];
+                    // Only update cells that aren't ships
+                    if (cell.texture.key === 'ocean') {
+                        cell.clearTint();
+                        if (tint) {
+                            cell.setTint(tint);
+                        }
+                    }
+                }
             }
         }
     }
