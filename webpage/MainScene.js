@@ -1,4 +1,5 @@
-// view of the Computer's grid
+// MainScene handles the main gameplay for Battleship, including the CPU's board, player interactions,
+// and game state management. It coordinates the ship placement phase and battle phase.
 class MainScene extends Phaser.Scene {
     constructor() {
         super("playGame");
@@ -29,54 +30,45 @@ class MainScene extends Phaser.Scene {
         this.cpuWins = 0;
         this.placementPhase = true;
         this.timeText = null;
-        this.waveTexture = null;
         this.updateTimer = 0;
-        this.currentOceanTint = Phaser.Display.Color.GetColor(255, 255, 255);
         
-        // Revert to original grid dimensions
+        this.tintManager = null;
+        
         this.gridSize = 10;
-        this.cellSize = 32; // Original cell size
+        this.cellSize = 32; 
         this.gridWidth = this.gridSize * this.cellSize;
-        this.gridSpacing = 100; // Original spacing
+        this.gridSpacing = 100;
     }
 
+    // Preload all game assets including ships, hits, misses, and ocean textures
     preload() {
         this.load.image("ship", "assets/ship.png");
         this.load.image("hit", "assets/hit.png");
         this.load.image("miss", "assets/miss.png");
-        
-        // Load the static ocean image
         this.load.image("ocean", "assets/ocean.png");
-        
-        // Set up interval to check time and update tint
-        this.oceanTintTimer = setInterval(() => this.updateOceanTint(), 60000); // every minute
-        this.updateOceanTint(); // Initial call
     }
 
+    // Initialize the game scene, set up grids, UI elements, and game state
     async create() {
-        // Calculate grid positions to center in the canvas
         this.canvasWidth = this.sys.game.config.width;
         this.canvasHeight = this.sys.game.config.height;
         
-        // The total width taken by both grids and the spacing between them
         const totalGridsWidth = (this.gridWidth * 2) + this.gridSpacing;
         
-        // Calculate the starting X position to center both grids
         this.leftGridX = (this.canvasWidth - totalGridsWidth) / 2;
         this.rightGridX = this.leftGridX + this.gridWidth + this.gridSpacing;
         
-        // Y position (centered vertically in the available space)
-        // Calculate available height (total height minus space for headers/footers)
-        const headerFooterSpace = 160; // Space for headers, footers, and margins
+        const headerFooterSpace = 160;
         const availableHeight = this.canvasHeight - headerFooterSpace;
         this.gridsY = (this.canvasHeight - this.gridWidth) / 2;
         
-        // If grids are too low, adjust upward
         if (this.gridsY + this.gridWidth > this.canvasHeight - 60) {
             this.gridsY = this.canvasHeight - this.gridWidth - 60;
         }
         
-        // Load initial win counts
+        this.tintManager = new TintManager(this);
+        await this.tintManager.initialize();
+        
         try {
             const response = await fetch('/api/wins');
             const data = await response.json();
@@ -86,7 +78,6 @@ class MainScene extends Phaser.Scene {
             console.error('Error loading win counts:', error);
         }
 
-        // Get current time
         try {
             const timeResponse = await fetch('/api/time');
             const timeData = await timeResponse.json();
@@ -96,10 +87,8 @@ class MainScene extends Phaser.Scene {
             this.currentTime = { hour: 0, minute: 0, second: 0 };
         }
 
-        // Generate CPU board
         this.CPUboard = this.generateBoards();
         
-        // Cheat Sheet for CPU board
         for (let row = 0; row < this.CPUboard.length; row++) {
             let rowString = '';
             for (let col = 0; col < this.CPUboard[row].length; col++) {
@@ -108,10 +97,8 @@ class MainScene extends Phaser.Scene {
             console.log(rowString);
         }
 
-        // Create empty CPU grid (not interactive during placement)
         this.createCPUGrid();
 
-        // Center the headers above each grid
         this.infoboard = this.add.text(
             this.leftGridX + (this.gridWidth / 2), 
             this.gridsY - 50, 
@@ -127,16 +114,14 @@ class MainScene extends Phaser.Scene {
         this.infoboard.setOrigin(0.5, 0.5);
         this.CPUinfo.setOrigin(0.5, 0.5);
 
-        // Add time display (keeping original position as requested)
         this.timeText = this.add.text(
-            this.canvasWidth / 2, // Center horizontally based on new width (1100px)
+            this.canvasWidth / 2,
             20, 
             this.formatTime(this.currentTime.hour, this.currentTime.minute), 
             this.textStyle
         );
         this.timeText.setOrigin(0.5, 0.5);
 
-        // Add win count displays under each grid
         this.playerWinText = this.add.text(
             this.leftGridX + (this.gridWidth / 2), 
             this.gridsY + this.gridWidth + 50, 
@@ -156,207 +141,129 @@ class MainScene extends Phaser.Scene {
             .on('pointerover', () => this.enterButtonHoverStateInfo())
             .on('pointerout', () => this.enterButtonRestStateInfo());
 
-        // Initialize ship placement
         this.shipPlacement = new ShipPlacement(this);
         this.shipPlacement.createPlayerGrid();
         
-        // Set up timer to update both grids regularly
         this.time.addEvent({
-            delay: 2000, // Update every 2 seconds
+            delay: 2000,
             callback: this.updateBothGrids,
             callbackScope: this,
             loop: true
         });
     }
 
+    // Format the hour and minute into a 12-hour time format with AM/PM
     formatTime(hour, minute) {
         const period = hour >= 12 ? 'PM' : 'AM';
-        const displayHour = hour % 12 || 12; // Convert to 12-hour format
+        const displayHour = hour % 12 || 12;
         const displayMinute = minute.toString().padStart(2, '0');
         return `${displayHour}:${displayMinute} ${period}`;
     }
 
-    updateOceanTint() {
-        // Get current time to calculate appropriate tint
-        fetch('/api/time')
-            .then(response => response.json())
-            .then(timeData => {
-                // Update time display
-                this.currentTime = timeData;
-                if (this.timeText) {
-                    this.timeText.setText(this.formatTime(timeData.hour, timeData.minute));
-                }
-                
-                // Calculate tint based on time
-                const hour = timeData.hour;
-                let blueIntensity;
-                
-                if (hour >= 6 && hour < 18) {
-                    // 6am to 6pm: gradually get lighter
-                    const minutesSince6am = (hour - 6) * 60 + timeData.minute;
-                    const totalMinutes = 12 * 60; // 12 hours in minutes
-                    blueIntensity = 100 + (155 * minutesSince6am / totalMinutes);
-                } else {
-                    // 6pm to 6am: gradually get darker
-                    let minutesSince6pm;
-                    if (hour >= 18) {
-                        minutesSince6pm = (hour - 18) * 60 + timeData.minute;
-                    } else {
-                        minutesSince6pm = ((hour + 24) - 18) * 60 + timeData.minute;
-                    }
-                    const totalMinutes = 12 * 60; // 12 hours in minutes
-                    blueIntensity = 255 - (155 * minutesSince6pm / totalMinutes);
-                }
-                
-                blueIntensity = Math.max(100, Math.min(255, Math.floor(blueIntensity)));
-                
-                // Calculate tint color (keep red and green channels at max, adjust blue)
-                const tintColor = Phaser.Display.Color.GetColor(
-                    255,
-                    255,
-                    blueIntensity
-                );
-                
-                // Store the current tint value
-                this.currentOceanTint = tintColor;
-                
-                // Update all ocean tiles with the new tint
-                this.refreshWaveTextures();
-            })
-            .catch(error => {
-                console.error('Error updating time:', error);
-                // Use local time as fallback
-                const now = new Date();
-                if (this.timeText) {
-                    this.timeText.setText(this.formatTime(now.getHours(), now.getMinutes()));
-                }
-            });
-    }
-
-    refreshWaveTextures() {
-        // Update CPU grid textures
-        if (this.cpuGridArray) {
-            for (let row = 0; row < 10; row++) {
-                for (let col = 0; col < 10; col++) {
-                    const cell = this.cpuGridArray[row][col];
-                    if (cell.texture.key === 'ocean') {
-                        cell.clearTint();
-                        cell.setTint(this.currentOceanTint);
-                    }
-                }
-            }
-        }
-        
-        // Update player grid textures - only during placement phase
-        // During game phase, player grid is recreated in CPUmove
-        if (this.shipPlacement && this.placementPhase) {
-            this.shipPlacement.refreshWaveTextures(this.currentOceanTint);
-        }
-    }
-
+    // Create the CPU's grid with ocean cells and apply initial tints
     createCPUGrid() {
         const CPUarray = Array.from({ length: 10 }, () => Array(10).fill(0));
 
-        // Iterate over the grid and assign the wave image to each cell for CPU board
         for (let row = 0; row < 10; row++) {
             for (let col = 0; col < 10; col++) {
-                // Add the wave image to the scene at the correct position
                 const x = this.leftGridX + (col * this.cellSize);
                 const y = this.gridsY + (row * this.cellSize);
 
                 const wave = this.add.image(x, y, "ocean");
-                wave.setScale(0.05); // Original scale
+                wave.setScale(0.05);
                 wave.setOrigin(0);
-                wave.setDepth(1); // Set depth to 1 for waves
+                wave.setDepth(1);
                 
-                // Store the wave image in the grid
+                wave.setTint(this.tintManager.currentOceanTint);
+                
                 CPUarray[row][col] = wave;
             }
         }
         
         this.cpuGridArray = CPUarray;
         
-        // Draw grid lines AFTER creating the ocean tiles, with higher depth
         this.drawGridLines();
     }
     
-    // Create a separate method to draw grid lines with higher visibility
+    // Draw grid lines for both the player and CPU grids for better visibility
     drawGridLines() {
-        // Create a graphics object for grid lines with higher depth
         if (this.gridLines) {
             this.gridLines.clear();
             this.gridLines.destroy();
         }
         
         this.gridLines = this.add.graphics();
-        this.gridLines.setDepth(10); // Higher depth to ensure visibility
-        this.gridLines.lineStyle(1, 0xFFFFFF, 1); // Simple 1px white lines
+        this.gridLines.setDepth(10);
+        this.gridLines.lineStyle(1, 0xFFFFFF, 1);
         
-        // Draw simple grid lines for CPU grid (left side)
         for (let i = 0; i <= 10; i++) {
-            // Horizontal lines
             const y = this.gridsY + (i * this.cellSize);
             this.gridLines.moveTo(this.leftGridX, y);
             this.gridLines.lineTo(this.leftGridX + (10 * this.cellSize), y);
             
-            // Vertical lines
             const x = this.leftGridX + (i * this.cellSize);
             this.gridLines.moveTo(x, this.gridsY);
             this.gridLines.lineTo(x, this.gridsY + (10 * this.cellSize));
         }
         
-        // Draw simple grid lines for Player grid (right side)
         for (let i = 0; i <= 10; i++) {
-            // Horizontal lines
             const y = this.gridsY + (i * this.cellSize);
             this.gridLines.moveTo(this.rightGridX, y);
             this.gridLines.lineTo(this.rightGridX + (10 * this.cellSize), y);
             
-            // Vertical lines
             const x = this.rightGridX + (i * this.cellSize);
             this.gridLines.moveTo(x, this.gridsY);
             this.gridLines.lineTo(x, this.gridsY + (10 * this.cellSize));
         }
         
-        // Stroke the lines
         this.gridLines.strokePath();
     }
     
-    // Called by ShipPlacement when all ships are placed
+    // Transition from ship placement phase to game phase and make CPU grid interactive
     startGameAfterPlacement() {
         this.placementPhase = false;
         
-        // Make CPU grid interactive for attacks
         for (let row = 0; row < 10; row++) {
             for (let col = 0; col < 10; col++) {
                 this.cpuGridArray[row][col].setInteractive()
                     .on('pointerdown', () => this.onClickWave(row, col, this.cpuGridArray[row][col]))
-                    .on('pointerover', () => this.enterButtonHoverState(this.cpuGridArray[row][col]))
-                    .on('pointerout', () => this.enterButtonRestState(this.cpuGridArray[row][col]));
+                    .on('pointerover', () => {
+                        this.enterButtonHoverState(this.cpuGridArray[row][col]);
+                        this.cpuGridArray[row][col].isFilled = true;
+                    })
+                    .on('pointerout', () => {
+                        this.enterButtonRestState(this.cpuGridArray[row][col]);
+                        this.cpuGridArray[row][col].isFilled = false;
+                    });
             }
         }
     }
 
+    // Handle player clicks on the CPU grid to make attacks
     onClickWave(x, y, wave) {
         if (this.isOver === 0) {
             if (this.Playerattemptboard[x][y] != 1 && this.Playerattemptboard[x][y] != 2) {
+                wave.clearTint();
+                wave.isFilled = false;
+                
                 this.gameChecks(x, y, wave);
                 this.CPUmove(wave);
             }
         }
         wave.disableInteractive();
-        wave.clearTint();
     }
 
+    // Apply hover effect when mouse is over a grid cell
     enterButtonHoverState(wave) {
-        wave.clearTint();
-        wave.setTintFill("0x000000");
+        this.tintManager.enterButtonHoverState(wave);
     }
 
+    // Remove hover effect when mouse leaves a grid cell
     enterButtonRestState(wave) {
-        wave.clearTint();
+        this.tintManager.enterButtonRestState(wave);
     }
 
+    // Handle game restart when clicking the info board at game end
     onClickInfo() {
         this.CPUboard = Array.from({ length: 10 }, () => Array(10).fill(0));;
         this.Playerboard = Array.from({ length: 10 }, () => Array(10).fill(0));;
@@ -372,20 +279,22 @@ class MainScene extends Phaser.Scene {
         this.infoboard.clearTint();
     }
 
+    // Apply hover effect to info board
     enterButtonHoverStateInfo() {
         this.infoboard.clearTint();
         this.infoboard.setTintFill("Gray");
     }
 
+    // Remove hover effect from info board
     enterButtonRestStateInfo() {
         this.infoboard.clearTint();
     }
 
+    // Generate random ship placements for the CPU board
     generateBoards() {
         const board = Array(10).fill().map(() => Array(10).fill(0));
 
         const ships = [5, 4, 3, 3, 2];
-
 
         const placeShip = (size) => {
             let row;
@@ -399,15 +308,12 @@ class MainScene extends Phaser.Scene {
                 dir = Math.random() < 0.5 ? 0 : 1;
                 canPlace = true;
 
-
                 for (let i = 0; i < size; i++) {
-
                     if (dir === 0) {
                         if (col + i >= 10 || board[row][col + i] === 1) {
                             canPlace = false;
                         }
                     }
-
                     else if (dir === 1) {
                         if (row + i >= 10 || board[row + i][col] === 1) {
                             canPlace = false;
@@ -415,7 +321,6 @@ class MainScene extends Phaser.Scene {
                     }
                 }
             }
-
 
             for (let i = 0; i < size; i++) {
                 if (dir === 0) {
@@ -426,7 +331,6 @@ class MainScene extends Phaser.Scene {
             }
         };
 
-
         ships.forEach(size => {
             placeShip(size);
         });
@@ -434,6 +338,7 @@ class MainScene extends Phaser.Scene {
         return board;
     }
 
+    // Check if a player's attack hits or misses and update the game state
     gameChecks(x, y, wave) {
         if (this.CPUboard[x][y] == 0) {
             this.Playerattemptboard[x][y] = 1;
@@ -449,6 +354,7 @@ class MainScene extends Phaser.Scene {
         }
     }
 
+    // Handle the CPU's turn to attack the player's board
     CPUmove() {
         let x;
         let y;
@@ -526,42 +432,37 @@ class MainScene extends Phaser.Scene {
 
         for (let row = 0; row < 10; row++) {
             for (let col = 0; col < 10; col++) {
-                // Add the wave image to the scene at the correct position
                 const x = this.rightGridX + (col * this.cellSize);
                 const y = this.gridsY + (row * this.cellSize);
                 const wave = this.add.image(x, y, "ocean");
 
                 if (this.Playerboard[row][col] == 1) {
                     wave.setTexture('ship');
-                }
-                if (this.CPUattemptboard[row][col] === 1) {
+                    wave.setTint(this.tintManager.currentShipTint);
+                } else if (this.CPUattemptboard[row][col] === 1) {
                     wave.setTexture('miss');
-                }
-                if (this.CPUattemptboard[row][col] === 2) {
+                    wave.setTint(this.tintManager.currentMissTint);
+                } else if (this.CPUattemptboard[row][col] === 2) {
                     wave.setTexture('hit');
+                    wave.setTint(this.tintManager.currentHitTint);
+                } else {
+                    wave.setTint(this.tintManager.currentOceanTint);
                 }
                 
-                wave.setScale(0.05); // Original scale
+                wave.setScale(0.05);
                 wave.setOrigin(0);
-                wave.setDepth(1); // Set depth to 1 for all tiles
-                
-                // Apply current ocean tint to water tiles
-                if (wave.texture.key === 'ocean') {
-                    wave.setTint(this.currentOceanTint);
-                }
+                wave.setDepth(1);
 
-                // Store the wave image in the grid
                 Playerarray[row][col] = wave;
             }
         }
         
-        // Store the player grid array for future tint updates
         this.playerGridArray = Playerarray;
         
-        // Redraw the grid lines on top of all tiles
         this.drawGridLines();
     }
 
+    // Update the win counts in the UI and save to the server
     async updateWins(outcome) {
         if (outcome === 1) {
             this.cpuWins++;
@@ -569,11 +470,9 @@ class MainScene extends Phaser.Scene {
             this.playerWins++;
         }
 
-        // Update the display under each grid
         this.playerWinText.setText(`Wins: ${this.playerWins}`);
         this.cpuWinText.setText(`Wins: ${this.cpuWins}`);
 
-        // Save to API
         try {
             const response = await fetch('/api/wins', {
                 method: 'POST',
@@ -593,46 +492,40 @@ class MainScene extends Phaser.Scene {
         }
     }
 
+    // Handle the end of the game, display winner and enable restart
     gameEnd(outcome) {
         this.isOver = 1;
         this.updateWins(outcome);
         
         const CPUarray = Array.from({ length: 10 }, () => Array(10).fill(0));
         
-        // Iterate over the grid and assign the wave image to each cell
         for (let row = 0; row < 10; row++) {
             for (let col = 0; col < 10; col++) {
-                // Add the wave image to the scene at the correct position
                 const x = this.leftGridX + (col * this.cellSize);
                 const y = this.gridsY + (row * this.cellSize);
                 const wave = this.add.image(x, y, "ocean");
                 
                 if (this.Playerattemptboard[row][col] === 1) {
                     wave.setTexture('miss');
-                }
-                if (this.Playerattemptboard[row][col] === 2) {
+                    wave.setTint(this.tintManager.currentMissTint);
+                } else if (this.Playerattemptboard[row][col] === 2) {
                     wave.setTexture('hit');
+                    wave.setTint(this.tintManager.currentHitTint);
+                } else {
+                    wave.setTint(this.tintManager.currentOceanTint);
                 }
                 
                 wave.disableInteractive();
-                wave.setScale(0.05); // Original scale
+                wave.setScale(0.05);
                 wave.setOrigin(0);
-                wave.setDepth(1); // Set depth to 1 for all tiles
+                wave.setDepth(1);
                 
-                // Apply current ocean tint to water tiles
-                if (wave.texture.key === 'ocean') {
-                    wave.setTint(this.currentOceanTint);
-                }
-                
-                // Store the wave image in the grid
                 CPUarray[row][col] = wave;
             }
         }
         
-        // Replace the CPU grid array for future tint updates
         this.cpuGridArray = CPUarray;
         
-        // Redraw grid lines with higher visibility
         this.drawGridLines();
         
         if (outcome === 1) {
@@ -648,48 +541,66 @@ class MainScene extends Phaser.Scene {
 
     // Clean up resources when scene is shut down
     shutdown() {
-        if (this.oceanTintTimer) {
-            clearInterval(this.oceanTintTimer);
-            this.oceanTintTimer = null;
+        if (this.tintManager) {
+            this.tintManager.shutdown();
         }
     }
     
-    // Also handle when scene is destroyed
+    // Handle additional cleanup when scene is destroyed
     destroy() {
         this.shutdown();
         super.destroy();
     }
 
-    // This method will be called on a timer to update both grids
+    // Regularly update the tints on both player and CPU grids
     updateBothGrids() {
-        // Update CPU grid
+        this.tintManager.refreshTintsForAllCells();
+        
         if (this.cpuGridArray) {
             for (let row = 0; row < 10; row++) {
                 for (let col = 0; col < 10; col++) {
                     const cell = this.cpuGridArray[row][col];
-                    if (cell.texture.key === 'ocean') {
-                        cell.clearTint();
-                        cell.setTint(this.currentOceanTint);
+                    if (cell && cell.texture) {
+                        if (!cell.isFilled) {
+                            cell.clearTint();
+                            cell.setTint(this.tintManager.getCurrentTintForType(cell.texture.key));
+                            
+                            if (!cell.customData) {
+                                cell.customData = {};
+                            }
+                            cell.customData.originalTint = this.tintManager.getCurrentTintForType(cell.texture.key);
+                        }
                     }
                 }
             }
         }
         
-        // Update player grid (if we're in game phase)
         if (!this.placementPhase && this.playerGridArray) {
             for (let row = 0; row < 10; row++) {
                 for (let col = 0; col < 10; col++) {
                     const cell = this.playerGridArray[row][col];
-                    if (cell && cell.texture.key === 'ocean') {
-                        cell.clearTint();
-                        cell.setTint(this.currentOceanTint);
+                    if (cell && cell.texture) {
+                        if (!cell.isFilled) {
+                            cell.clearTint();
+                            cell.setTint(this.tintManager.getCurrentTintForType(cell.texture.key));
+                            
+                            if (!cell.customData) {
+                                cell.customData = {};
+                            }
+                            cell.customData.originalTint = this.tintManager.getCurrentTintForType(cell.texture.key);
+                        }
                     }
                 }
             }
         }
+        
+        if (this.placementPhase && this.shipPlacement && this.shipPlacement.playerGridArray) {
+            this.shipPlacement.refreshWaveTextures(this.tintManager.currentOceanTint);
+        }
     }
 }
 
+// Initialize the Phaser game instance with the main scene
 new Phaser.Game({
     width: 950,
     height: 550,

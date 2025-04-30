@@ -16,7 +16,7 @@ class ShipPlacement {
             50, 
             `Place your ${this.shipSizes[this.currentShipIndex]}-length ship. Press R to rotate.`, 
             {
-                font: '20px Arial',
+                font: '16px Arial',
                 fill: 'Black',
                 align: 'center'
             }
@@ -43,6 +43,9 @@ class ShipPlacement {
                 wave.setScale(0.05); // Original scale
                 wave.setOrigin(0);
                 wave.setDepth(1); // Set depth so grid lines can appear on top
+                
+                // Apply ocean tint using TintManager
+                wave.setTint(this.scene.tintManager.currentOceanTint);
                 
                 // Make cells interactive during placement phase
                 wave.setInteractive()
@@ -87,6 +90,10 @@ class ShipPlacement {
             
             if (row >= 0 && row < 10 && col >= 0 && col < 10) {
                 const cell = this.playerGridArray[row][col];
+                
+                // Track filled state for tint management
+                cell.isFilled = true;
+                
                 if (isValid) {
                     cell.setTintFill(0x00FF00); // Green for valid
                 } else {
@@ -99,7 +106,14 @@ class ShipPlacement {
     clearPlacementPreview() {
         for (let row = 0; row < 10; row++) {
             for (let col = 0; col < 10; col++) {
-                this.playerGridArray[row][col].clearTint();
+                const cell = this.playerGridArray[row][col];
+                cell.clearTint();
+                
+                // Mark as not filled for tint management
+                cell.isFilled = false;
+                
+                // Apply time-based tint based on element type using TintManager
+                cell.setTint(this.scene.tintManager.getCurrentTintForType(cell.texture.key));
             }
         }
         
@@ -107,6 +121,8 @@ class ShipPlacement {
         this.playerShipCells.forEach(cell => {
             const { row, col } = cell;
             this.playerGridArray[row][col].setTexture('ship');
+            // Apply time-based tint to ships
+            this.playerGridArray[row][col].setTint(this.scene.tintManager.getCurrentTintForType('ship'));
         });
     }
     
@@ -155,6 +171,8 @@ class ShipPlacement {
                 
                 // Update visuals
                 this.playerGridArray[shipRow][shipCol].setTexture('ship');
+                // Apply ship tint using TintManager
+                this.playerGridArray[shipRow][shipCol].setTint(this.scene.tintManager.currentShipTint);
                 
                 // Track for redrawing
                 this.playerShipCells.push({ row: shipRow, col: shipCol });
@@ -178,12 +196,11 @@ class ShipPlacement {
             for (let row = 0; row < 10; row++) {
                 for (let col = 0; col < 10; col++) {
                     const cell = this.playerGridArray[row][col];
-                    // Only update cells that aren't ships
-                    if (cell.texture.key === 'ocean') {
+                    // Skip cells that are being hovered over
+                    if (!cell.isFilled) {
                         cell.clearTint();
-                        if (tint) {
-                            cell.setTint(tint);
-                        }
+                        // Apply time-based tint based on element type using TintManager
+                        cell.setTint(this.scene.tintManager.getCurrentTintForType(cell.texture.key));
                     }
                 }
             }
