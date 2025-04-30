@@ -17,8 +17,7 @@ class TintManager {
         // Initial tint update
         await this.updateOceanTint();
         
-        // Set up interval to check time and update tint (every 15 seconds)
-        this.updateTimer = setInterval(() => this.updateOceanTint(), 15000);
+        this.updateTimer = setInterval(() => this.updateOceanTint(), 10);
         
         return this;
     }
@@ -32,13 +31,11 @@ class TintManager {
             const prevHour = this.currentTime ? this.currentTime.hour : -1;
             const prevMinute = this.currentTime ? this.currentTime.minute : -1;
             
-            // Update time display in the main scene
             this.currentTime = timeData;
             if (this.scene.timeText) {
                 this.scene.timeText.setText(this.scene.formatTime(timeData.hour, timeData.minute));
             }
             
-            // Calculate tint based on time
             const hour = timeData.hour;
             let blueIntensity;
             
@@ -63,20 +60,12 @@ class TintManager {
             
             // Store the current tint values for different element types
             
-            // Ocean - full blue tint effect
             this.currentOceanTint = Phaser.Display.Color.GetColor(255, 255, blueIntensity);
             
-            // Ships - slightly bluer tint (75% of the effect)
-            const shipBlue = Math.floor(255 - ((255 - blueIntensity) * 0.75));
-            this.currentShipTint = Phaser.Display.Color.GetColor(255, 255, shipBlue);
-            
-            // Hits - reddish tint with time influence (50% of the effect)
-            const hitBlue = Math.floor(255 - ((255 - blueIntensity) * 0.5));
-            this.currentHitTint = Phaser.Display.Color.GetColor(255, 200, hitBlue);
-            
-            // Misses - whitish tint with time influence (25% of the effect)
-            const missBlue = Math.floor(255 - ((255 - blueIntensity) * 0.25));
-            this.currentMissTint = Phaser.Display.Color.GetColor(255, 255, missBlue);
+            const blue = Math.floor(255 - ((255 - blueIntensity)));
+            this.currentShipTint = Phaser.Display.Color.GetColor(255, 255, blue);
+            this.currentHitTint = Phaser.Display.Color.GetColor(255, 255, blue);
+            this.currentMissTint = Phaser.Display.Color.GetColor(255, 255, blue);
             
             // Apply the updated tints to all game elements
             this.applyTintsToElements();
